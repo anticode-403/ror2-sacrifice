@@ -39,11 +39,6 @@ namespace Sacrifice
         "Reduce Barrel Spawns",
         "Reduce the spawn rate of barrels.",
         true);
-      BanBarrels = Config.Wrap(
-        "Bans",
-        "Barrels",
-        "Ban any barrels that aren't Equipment Barrels",
-        false);
       BanChests = Config.Wrap(
         "Bans",
         "Chests",
@@ -54,6 +49,21 @@ namespace Sacrifice
         "Lunar Chests",
         "Ban lunar chests",
         true);
+      BanTripleShops = Config.Wrap(
+        "Bans",
+        "Triple Shop",
+        "Ban triple shops",
+        true);
+      BanEquipmentBarrels = Config.Wrap(
+        "Bans",
+        "Equipment Barrels",
+        "Ban equipment barrels",
+        true);
+      BanBarrels = Config.Wrap(
+        "Bans",
+        "Barrels",
+        "Ban any barrels that aren't Equipment Barrels",
+        false);
       BanBloodShrine = Config.Wrap(
         "Bans",
         "Blood Shrine",
@@ -64,60 +74,42 @@ namespace Sacrifice
         "Chance Shrine",
         "Ban chance shrines",
         true);
-      BanTripleShops = Config.Wrap(
-        "Bans",
-        "Triple Shop",
-        "Ban triple shops",
-        true);
       BanOtherShrines = Config.Wrap(
         "Bans",
         "Other Shrines",
         "Ban any shrines that aren't blood shrines or chance shrines.",
         false);
-      BanEquipmentBarrels = Config.Wrap(
-        "Bans",
-        "Equipment Barrels",
-        "Ban equipment barrels",
-        true);
     }
 
     public void Awake()
     {
-      On.RoR2.PlayerCharacterMasterController.Init += (orig) =>
-      {
-        GlobalEventManager.onCharacterDeathGlobal += (damageReport) =>
-        {
-          GameObject masterObject = damageReport.damageInfo.attacker.GetComponent<CharacterBody>().masterObject;
-          if (masterObject == null) return;
-          RollSpawnChance(damageReport, masterObject);
-        };
-        orig();
-      };
+      // Give players and their allies the chance to drop items.
       On.RoR2.CharacterMaster.Init += (orig) =>
       {
         GlobalEventManager.onCharacterDeathGlobal += (damageReport) =>
         {
           CharacterBody attackerBody = damageReport.damageInfo.attacker.GetComponent<CharacterBody>();
           GameObject masterObject = attackerBody.masterObject;
-          if (masterObject == null || attackerBody.name != "EngiTurretBody") return;
+          if (masterObject == null || attackerBody.teamComponent.teamIndex == TeamIndex.Player) return;
           RollSpawnChance(damageReport, masterObject);
         };
         orig();
       };
+      // Remove banned items from cards. This replaces the default card selection behavior.
       On.RoR2.ClassicStageInfo.GenerateDirectorCardWeightedSelection += (orig, instance, categorySelection) =>
       {
         WeightedSelection<DirectorCard> weightedSelection = new WeightedSelection<DirectorCard>(8);
         foreach (DirectorCardCategorySelection.Category category in categorySelection.categories)
         {
           float num = categorySelection.SumAllWeightsInCategory(category);
-          foreach (RoR2.DirectorCard directorCard in category.cards)
+          foreach (DirectorCard directorCard in category.cards)
           {
             if (IsBanned(directorCard)) continue;
             if (CardIsBarrel(directorCard) && ReduceBarrelSpawns.Value)
             {
               directorCard.selectionWeight /= 2;
             }
-            weightedSelection.AddChoice(directorCard, (float)directorCard.selectionWeight / num * category.selectionWeight);
+            weightedSelection.AddChoice(directorCard, directorCard.selectionWeight / num * category.selectionWeight);
           }
         }
         return weightedSelection;

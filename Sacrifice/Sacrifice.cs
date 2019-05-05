@@ -1,4 +1,5 @@
 ﻿using BepInEx;
+using System;
 using System.Collections.Generic;
 using RoR2;
 using UnityEngine;
@@ -21,6 +22,7 @@ namespace Sacrifice
     public static ConfigWrapper<bool> BanOtherShrines;
     public static ConfigWrapper<bool> BanLunarChests;
     public static ConfigWrapper<bool> ReduceBarrelSpawns;
+    public static ConfigWrapper<bool> GiveItemToPlayers;
     public Sacrifice()
     {
       // Fuck me, this is a long list of configs.
@@ -39,6 +41,11 @@ namespace Sacrifice
         "Reduce Barrel Spawns",
         "Reduce the spawn rate of barrels.",
         true);
+      GiveItemToPlayers = Config.Wrap(
+        "Other",
+        "Give items to players",
+        "Give items directly to all players, without dropping them first.",
+        false);
       BanChests = Config.Wrap(
         "Bans",
         "Chests",
@@ -116,7 +123,57 @@ namespace Sacrifice
       };
     }
 
-    private static bool IsBanned (DirectorCard card)
+    private void RollSpawnChance(DamageReport damageReport, GameObject masterObject)
+    {
+      // Roll percent chance has a base value of 7% (configurable), multiplied by 1 + .3 per player above 1.
+      float percentChance = (BaseDropChance.Value / 100) * (1f + (Run.instance.participatingPlayerCount - 1f) * 0.3f);
+      percentChance = percentChance < 0.2f ? percentChance : 0.2f;
+      WeightedSelection<List<PickupIndex>> weightedSelection = new WeightedSelection<List<PickupIndex>>(8);
+      // This is done this way because elite bosses are possible, and should have the option to drop reds than their standard boss counterparts.
+      if (damageReport.victimBody.isElite)
+      {
+        weightedSelection.AddChoice(Run.instance.availableLunarDropList, 0.05f);
+        weightedSelection.AddChoice(Run.instance.availableTier2DropList, 0.3f);
+        weightedSelection.AddChoice(Run.instance.availableTier3DropList, 0.1f);
+      }
+      if (damageReport.victimBody.isBoss)
+      {
+        weightedSelection.AddChoice(Run.instance.availableTier2DropList, 0.6f);
+        weightedSelection.AddChoice(Run.instance.availableTier3DropList, 0.3f);
+      }
+      // If the enemy in question is dead, then chances shoulder be the default for chests + some equipment item drop chances.
+      else if (!damageReport.victimBody.isElite)
+      {
+        weightedSelection.AddChoice(Run.instance.availableEquipmentDropList, 0.05f);
+        weightedSelection.AddChoice(Run.instance.availableTier1DropList, 0.8f);
+        weightedSelection.AddChoice(Run.instance.availableTier2DropList, 0.2f);
+        weightedSelection.AddChoice(Run.instance.availableTier3DropList, 0.01f);
+      }
+      // Item to drop is generated before the item pick up is generated for a future update.
+      List<PickupIndex> list = weightedSelection.Evaluate(Run.instance.spawnRng.nextNormalizedFloat);
+      PickupIndex pickupIndex = list[Run.instance.spawnRng.RangeInt(0, list.Count)];
+      CharacterMaster master = masterObject.GetComponent<CharacterMaster>();
+      if (Util.CheckRoll(percentChance, (master && CloverRerollDrops.Value) ? master.luck : 0f, null))
+      {
+        if (GiveItemToPlayers.Value)
+        {
+          foreach (NetworkUser networkUser in NetworkUser.readOnlyInstancesList)
+          {
+            networkUser.master.inventory.GiveItem(pickupIndex.itemIndex, 1);
+          }
+        }
+        else
+        {
+          PickupDropletController.CreatePickupDroplet(
+            pickupIndex,
+            damageReport.victim.transform.position,
+            new Vector3(UnityEngine.Random.Range(-5.0f, 5.0f), 15f, UnityEngine.Random.Range(-5.0f, 5.0f)));
+        }
+      }
+    }
+
+    /* The following is just an ugly block of functions for testing banned items */
+    private static bool IsBanned(DirectorCard card)
     {
       bool chest = BanChests.Value ? CardIsChest(card) : false;
       bool equipBarrel = BanEquipmentBarrels.Value ? CardIsEquipmentBarrel(card) : false;
@@ -175,41 +232,6 @@ namespace Sacrifice
     {
       string name = card.spawnCard.prefab.name;
       return name.Contains("Shrine") && !name.Contains("Blood") && !name.Contains("Chance");
-    }
-
-    private void RollSpawnChance(DamageReport damageReport, GameObject masterObject)
-    {
-      float percentChance = (BaseDropChance.Value / 100) * (1f + (Run.instance.participatingPlayerCount - 1f) * 0.3f);
-      percentChance = percentChance < 0.2f ? percentChance : 0.2f;
-      WeightedSelection<List<PickupIndex>> weightedSelection = new WeightedSelection<List<PickupIndex>>(8);
-      if (damageReport.victimBody.isElite)
-      {
-        weightedSelection.AddChoice(Run.instance.availableLunarDropList, 0.1f);
-        weightedSelection.AddChoice(Run.instance.availableTier2DropList, 0.4f);
-        weightedSelection.AddChoice(Run.instance.availableTier3DropList, 0.2f);
-      }
-      if (damageReport.victimBody.isBoss)
-      {
-        weightedSelection.AddChoice(Run.instance.availableTier2DropList, 0.7f);
-        weightedSelection.AddChoice(Run.instance.availableTier3DropList, 0.3f);
-      }
-      else if (!damageReport.victimBody.isElite)
-      {
-        weightedSelection.AddChoice(Run.instance.availableEquipmentDropList, 0.05f);
-        weightedSelection.AddChoice(Run.instance.availableTier1DropList, 0.8f);
-        weightedSelection.AddChoice(Run.instance.availableTier2DropList, 0.2f);
-        weightedSelection.AddChoice(Run.instance.availableTier3DropList, 0.01f);
-      }
-      List<PickupIndex> list = weightedSelection.Evaluate(Run.instance.spawnRng.nextNormalizedFloat);
-      PickupIndex pickupIndex = list[Run.instance.spawnRng.RangeInt(0, list.Count)];
-      PlayerCharacterMasterController component = masterObject.GetComponent<PlayerCharacterMasterController>();
-      if (component && Util.CheckRoll(percentChance, (component.master && CloverRerollDrops.Value) ? component.master.luck : 0f, null))
-      {
-        PickupDropletController.CreatePickupDroplet(
-          pickupIndex,
-          damageReport.victim.transform.position,
-          new Vector3(Random.Range(-3.0f, 3.0f), 15f, Random.Range(-3.0f, 3.0f)));
-      }
     }
   }
 }

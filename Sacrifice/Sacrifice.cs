@@ -22,6 +22,7 @@ namespace Sacrifice
     public static ConfigWrapper<bool> BanTripleShops;
     public static ConfigWrapper<bool> BanOtherShrines;
     public static ConfigWrapper<bool> BanLunarChests;
+    public static ConfigWrapper<bool> BanPrinter;
     public static ConfigWrapper<bool> ReduceBarrelSpawns;
     public static ConfigWrapper<bool> GiveItemToPlayers;
     public Sacrifice()
@@ -87,17 +88,34 @@ namespace Sacrifice
         "Other Shrines",
         "Ban any shrines that aren't blood shrines or chance shrines.",
         false);
+      BanPrinter = Config.Wrap(
+        "Bans",
+        "3D Printers",
+        "Ban 3D Printers",
+        false);
     }
 
     public void Awake()
     {
-      // Give players and their allies the chance to drop items.
+      On.RoR2.PlayerCharacterMasterController.Init += (orig) =>
+      {
+        GlobalEventManager.onCharacterDeathGlobal += (damageReport) =>
+        {
+          PlayerCharacterMasterController playerCharacterMasterController = 
+            damageReport.damageInfo.attacker.GetComponent<PlayerCharacterMasterController>();
+          if (playerCharacterMasterController == null || 
+            damageReport.victimBody.teamComponent.teamIndex != TeamIndex.Monster) return;
+          RollSpawnChance(damageReport);
+        };
+        orig();
+      };
+      // Give player allies the chance to drop items.
       On.RoR2.CharacterMaster.Init += (orig) =>
       {
         GlobalEventManager.onCharacterDeathGlobal += (damageReport) =>
         {
           GameObject masterObject = damageReport.damageInfo.attacker.GetComponent<CharacterBody>().masterObject;
-          if (masterObject == null) return;
+          if (masterObject == null || damageReport.victimBody.teamComponent.teamIndex != TeamIndex.Monster) return;
           RollSpawnChance(damageReport);
         };
         orig();
@@ -182,7 +200,8 @@ namespace Sacrifice
       bool barrel = BanBarrels.Value ? CardIsBarrel(card) : false;
       bool otherShrine = BanOtherShrines.Value ? CardIsOtherShrine(card) : false;
       bool lunarChest = BanLunarChests.Value ? CardIsLunarChest(card) : false;
-      return chest || equipBarrel || chanceShrine || bloodShrine || tripleShop || barrel || otherShrine || lunarChest;
+      bool printer = BanPrinter.Value ? CardIsPrinter(card) : false;
+      return chest || equipBarrel || chanceShrine || bloodShrine || tripleShop || barrel || otherShrine || lunarChest || printer;
     }
 
     private static bool CardIsLunarChest(DirectorCard card)
@@ -231,6 +250,12 @@ namespace Sacrifice
     {
       string name = card.spawnCard.prefab.name;
       return name.Contains("Shrine") && !name.Contains("Blood") && !name.Contains("Chance");
+    }
+    
+    private static bool CardIsPrinter(DirectorCard card)
+    {
+      string name = card.spawnCard.prefab.name;
+      return name.Contains("Printer");
     }
   }
 }

@@ -32,8 +32,6 @@ namespace Sacrifice
         "Base Drop Chance",
         "The base percent chance of an item dropping.",
         7);
-      DropChance = Convert.ToSingle(BaseDropChance.Value);
-      DropChance = DropChance < 1f ? 7f : DropChance;
       CloverRerollDrops = Config.Wrap(
         "Other",
         "Clovers Reroll Drops",
@@ -128,9 +126,7 @@ namespace Sacrifice
     private void RollSpawnChance(DamageReport damageReport)
     {
       // Roll percent chance has a base value of 7% (configurable), multiplied by 1 + .3 per player above 1.
-      float percentChance = (DropChance / 100) * (1f + (Run.instance.participatingPlayerCount - 1f) * 0.3f);
-      percentChance = percentChance >= 0.2f ? 0.2f : percentChance;
-      percentChance = percentChance <= 0.01f ? 0.07f : percentChance;
+      float percentChance = 0.07f * (1f + ((Run.instance.participatingPlayerCount - 1f) * 0.3f));
       WeightedSelection<List<PickupIndex>> weightedSelection = new WeightedSelection<List<PickupIndex>>(5);
       // This is done this way because elite bosses are possible, and should have the option to drop reds than their standard boss counterparts.
       if (damageReport.victimBody.isElite)

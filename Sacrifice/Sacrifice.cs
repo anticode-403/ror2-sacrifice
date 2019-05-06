@@ -97,7 +97,7 @@ namespace Sacrifice
         {
           CharacterBody attackerBody = damageReport.damageInfo.attacker.GetComponent<CharacterBody>();
           GameObject masterObject = attackerBody.masterObject;
-          if (masterObject == null || damageReport.victimBody.teamComponent.teamIndex == TeamIndex.Monster) return;
+          if (masterObject == null || damageReport.victimBody.teamComponent.teamIndex != TeamIndex.Monster) return;
           RollSpawnChance(damageReport, masterObject);
         };
         orig();

@@ -97,7 +97,7 @@ namespace Sacrifice
         {
           CharacterBody attackerBody = damageReport.damageInfo.attacker.GetComponent<CharacterBody>();
           GameObject masterObject = attackerBody.masterObject;
-          if (masterObject == null || attackerBody.teamComponent.teamIndex == TeamIndex.Player) return;
+          if (masterObject == null || damageReport.victimBody.teamComponent.teamIndex == TeamIndex.Monster) return;
           RollSpawnChance(damageReport, masterObject);
         };
         orig();
@@ -152,7 +152,7 @@ namespace Sacrifice
       // Item to drop is generated before the item pick up is generated for a future update.
       List<PickupIndex> list = weightedSelection.Evaluate(Run.instance.spawnRng.nextNormalizedFloat);
       PickupIndex pickupIndex = list[Run.instance.spawnRng.RangeInt(0, list.Count)];
-      CharacterMaster master = masterObject.GetComponent<CharacterMaster>();
+      CharacterMaster master = damageReport.damageInfo.attacker.GetComponent<CharacterMaster>();
       if (Util.CheckRoll(percentChance, (master && CloverRerollDrops.Value) ? master.luck : 0f, null))
       {
         if (GiveItemToPlayers.Value)

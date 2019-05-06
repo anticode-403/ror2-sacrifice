@@ -75,7 +75,6 @@ C:\Users\tronb\source\repos\Sacrifice\Sacrifice\bin\Release\Rewired_Core.dll
 C:\Users\tronb\source\repos\Sacrifice\Sacrifice\bin\Release\Wwise.dll
 C:\Users\tronb\source\repos\Sacrifice\Sacrifice\bin\Release\Zio.dll
 C:\Users\tronb\source\repos\Sacrifice\Sacrifice\bin\Release\Rewired_CSharp.dll
-C:\Users\tronb\source\repos\Sacrifice\Sacrifice\bin\Release\Mono.Security.dll
 C:\Users\tronb\source\repos\Sacrifice\Sacrifice\bin\Release\UnityEngine.xml
 C:\Users\tronb\source\repos\Sacrifice\Sacrifice\bin\Release\UnityEngine.AccessibilityModule.xml
 C:\Users\tronb\source\repos\Sacrifice\Sacrifice\bin\Release\UnityEngine.AIModule.xml

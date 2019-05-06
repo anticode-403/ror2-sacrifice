@@ -6,3 +6,5 @@ Customize all the variables in `BepInEx/config/com.anticode.Sacrifice.cfg`. Anyt
 
 # Todo:
  - add option to change drop chances.
+ - remove neutral entity's ability to drop items.
+ - move Sacrifice behavior to an artifact.

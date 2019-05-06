@@ -95,10 +95,9 @@ namespace Sacrifice
       {
         GlobalEventManager.onCharacterDeathGlobal += (damageReport) =>
         {
-          CharacterBody attackerBody = damageReport.damageInfo.attacker.GetComponent<CharacterBody>();
-          GameObject masterObject = attackerBody.masterObject;
-          if (masterObject == null || damageReport.victimBody.teamComponent.teamIndex != TeamIndex.Monster) return;
-          RollSpawnChance(damageReport, masterObject);
+          GameObject masterObject = damageReport.damageInfo.attacker.GetComponent<CharacterBody>().masterObject;
+          if (masterObject == null) return;
+          RollSpawnChance(damageReport);
         };
         orig();
       };
@@ -123,12 +122,13 @@ namespace Sacrifice
       };
     }
 
-    private void RollSpawnChance(DamageReport damageReport, GameObject masterObject)
+    private void RollSpawnChance(DamageReport damageReport)
     {
       // Roll percent chance has a base value of 7% (configurable), multiplied by 1 + .3 per player above 1.
-      float percentChance = (BaseDropChance.Value / 100) * (1f + (Run.instance.participatingPlayerCount - 1f) * 0.3f);
+      float percentChance = (Convert.ToSingle(BaseDropChance.Value) / 100) * (1f + (Run.instance.participatingPlayerCount - 1f) * 0.3f);
       percentChance = percentChance < 0.2f ? percentChance : 0.2f;
-      WeightedSelection<List<PickupIndex>> weightedSelection = new WeightedSelection<List<PickupIndex>>(8);
+      percentChance = percentChance > 0f ? percentChance : 0.07f;
+      WeightedSelection<List<PickupIndex>> weightedSelection = new WeightedSelection<List<PickupIndex>>(5);
       // This is done this way because elite bosses are possible, and should have the option to drop reds than their standard boss counterparts.
       if (damageReport.victimBody.isElite)
       {
@@ -152,7 +152,7 @@ namespace Sacrifice
       // Item to drop is generated before the item pick up is generated for a future update.
       List<PickupIndex> list = weightedSelection.Evaluate(Run.instance.spawnRng.nextNormalizedFloat);
       PickupIndex pickupIndex = list[Run.instance.spawnRng.RangeInt(0, list.Count)];
-      CharacterMaster master = damageReport.damageInfo.attacker.GetComponent<CharacterMaster>();
+      CharacterMaster master = damageReport.damageInfo.attacker.GetComponent<CharacterBody>().master;
       if (Util.CheckRoll(percentChance, (master && CloverRerollDrops.Value) ? master.luck : 0f, null))
       {
         if (GiveItemToPlayers.Value)
@@ -167,7 +167,7 @@ namespace Sacrifice
           PickupDropletController.CreatePickupDroplet(
             pickupIndex,
             damageReport.victim.transform.position,
-            new Vector3(UnityEngine.Random.Range(-5.0f, 5.0f), 15f, UnityEngine.Random.Range(-5.0f, 5.0f)));
+            new Vector3(UnityEngine.Random.Range(-5.0f, 5.0f), 30f, UnityEngine.Random.Range(-5.0f, 5.0f)));
         }
       }
     }

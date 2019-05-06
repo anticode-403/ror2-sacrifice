@@ -12,6 +12,7 @@ namespace Sacrifice
   public class Sacrifice : BaseUnityPlugin
   {
     public static ConfigWrapper<int> BaseDropChance;
+    private static float DropChance;
     public static ConfigWrapper<bool> CloverRerollDrops;
     public static ConfigWrapper<bool> BanChests;
     public static ConfigWrapper<bool> BanBarrels;
@@ -31,6 +32,7 @@ namespace Sacrifice
         "Base Drop Chance",
         "The base percent chance of an item dropping.",
         7);
+      DropChance = Convert.ToSingle(BaseDropChance.Value);
       CloverRerollDrops = Config.Wrap(
         "Other",
         "Clovers Reroll Drops",
@@ -125,9 +127,9 @@ namespace Sacrifice
     private void RollSpawnChance(DamageReport damageReport)
     {
       // Roll percent chance has a base value of 7% (configurable), multiplied by 1 + .3 per player above 1.
-      float percentChance = (Convert.ToSingle(BaseDropChance.Value) / 100) * (1f + (Run.instance.participatingPlayerCount - 1f) * 0.3f);
-      percentChance = percentChance < 0.2f ? percentChance : 0.2f;
-      percentChance = percentChance > 0f ? percentChance : 0.07f;
+      float percentChance = (DropChance / 100) * (1f + (Run.instance.participatingPlayerCount - 1f) * 0.3f);
+      percentChance = percentChance <= 0.2f ? percentChance : 0.2f;
+      percentChance = percentChance >= 0f ? percentChance : 0.07f;
       WeightedSelection<List<PickupIndex>> weightedSelection = new WeightedSelection<List<PickupIndex>>(5);
       // This is done this way because elite bosses are possible, and should have the option to drop reds than their standard boss counterparts.
       if (damageReport.victimBody.isElite)

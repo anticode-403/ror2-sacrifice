@@ -25,6 +25,8 @@ namespace Sacrifice
     public static ConfigWrapper<bool> BanPrinter;
     public static ConfigWrapper<bool> ReduceBarrelSpawns;
     public static ConfigWrapper<bool> GiveItemToPlayers;
+    public static ConfigWrapper<bool> BanDrones;
+    public static ConfigWrapper<bool> BanCloaked;
     public Sacrifice()
     {
       // Fuck me, this is a long list of configs.
@@ -33,6 +35,8 @@ namespace Sacrifice
         "Base Drop Chance",
         "The base percent chance of an item dropping.",
         7);
+      DropChance = Convert.ToSingle(BaseDropChance.Value);
+      if (DropChance <= 0) DropChance = 1f;
       CloverRerollDrops = Config.Wrap(
         "Other",
         "Clovers Reroll Drops",
@@ -51,8 +55,13 @@ namespace Sacrifice
       BanChests = Config.Wrap(
         "Bans",
         "Chests",
-        "Ban chests that aren't Lunar Chests.",
+        "Ban chests that aren't Lunar Chests or Cloaked Chests.",
         true);
+      BanCloaked = Config.Wrap(
+        "Bans",
+        "Cloaked Chests",
+        "Ban cloaked chests.",
+        false);
       BanLunarChests = Config.Wrap(
         "Bans",
         "Lunar Chests",
@@ -93,22 +102,15 @@ namespace Sacrifice
         "3D Printers",
         "Ban 3D Printers",
         false);
+      BanDrones = Config.Wrap(
+        "Bans",
+        "Drones",
+        "Ban drones",
+        true);
     }
 
     public void Awake()
     {
-      On.RoR2.PlayerCharacterMasterController.Init += (orig) =>
-      {
-        GlobalEventManager.onCharacterDeathGlobal += (damageReport) =>
-        {
-          PlayerCharacterMasterController playerCharacterMasterController = 
-            damageReport.damageInfo.attacker.GetComponent<PlayerCharacterMasterController>();
-          if (playerCharacterMasterController == null || 
-            damageReport.victimBody.teamComponent.teamIndex != TeamIndex.Monster) return;
-          RollSpawnChance(damageReport);
-        };
-        orig();
-      };
       // Give player allies the chance to drop items.
       On.RoR2.CharacterMaster.Init += (orig) =>
       {
@@ -132,6 +134,7 @@ namespace Sacrifice
             if (IsBanned(directorCard)) continue;
             if (CardIsBarrel(directorCard) && ReduceBarrelSpawns.Value)
             {
+              // Reduce selection weight for the Barrel card
               directorCard.selectionWeight /= 2;
             }
             weightedSelection.AddChoice(directorCard, directorCard.selectionWeight / num * category.selectionWeight);
@@ -144,7 +147,7 @@ namespace Sacrifice
     private void RollSpawnChance(DamageReport damageReport)
     {
       // Roll percent chance has a base value of 7% (configurable), multiplied by 1 + .3 per player above 1.
-      float percentChance = 0.07f * (1f + ((Run.instance.participatingPlayerCount - 1f) * 0.3f));
+      float percentChance = DropChance * (1f + ((NetworkUser.readOnlyInstancesList.Count - 1f) * 0.3f));
       WeightedSelection<List<PickupIndex>> weightedSelection = new WeightedSelection<List<PickupIndex>>(5);
       // This is done this way because elite bosses are possible, and should have the option to drop reds than their standard boss counterparts.
       if (damageReport.victimBody.isElite)
@@ -170,21 +173,26 @@ namespace Sacrifice
       List<PickupIndex> list = weightedSelection.Evaluate(Run.instance.spawnRng.nextNormalizedFloat);
       PickupIndex pickupIndex = list[Run.instance.spawnRng.RangeInt(0, list.Count)];
       CharacterMaster master = damageReport.damageInfo.attacker.GetComponent<CharacterBody>().master;
-      if (Util.CheckRoll(percentChance, (master && CloverRerollDrops.Value) ? master.luck : 0f, null))
+      float luck = 0f;
+      if (master && CloverRerollDrops.Value == true) luck = master.luck;
+      if (Util.CheckRoll(percentChance, luck, null))
       {
         if (GiveItemToPlayers.Value)
         {
           foreach (NetworkUser networkUser in NetworkUser.readOnlyInstancesList)
           {
+            // Distribute via NetworkUser's array of players.
+            Chat.AddMessage("Distributed " + pickupIndex.GetPickupNameToken() + " among players.");
             networkUser.master.inventory.GiveItem(pickupIndex.itemIndex, 1);
           }
         }
         else
         {
+          // Drop an item.
           PickupDropletController.CreatePickupDroplet(
             pickupIndex,
             damageReport.victim.transform.position,
-            new Vector3(UnityEngine.Random.Range(-5.0f, 5.0f), 30f, UnityEngine.Random.Range(-5.0f, 5.0f)));
+            new Vector3(UnityEngine.Random.Range(-5.0f, 5.0f), 20f, UnityEngine.Random.Range(-5.0f, 5.0f)));
         }
       }
     }
@@ -201,6 +209,8 @@ namespace Sacrifice
       bool otherShrine = BanOtherShrines.Value ? CardIsOtherShrine(card) : false;
       bool lunarChest = BanLunarChests.Value ? CardIsLunarChest(card) : false;
       bool printer = BanPrinter.Value ? CardIsPrinter(card) : false;
+      bool cloakedChest = BanCloaked.Value ? CardIsCloakedChest(card) : false;
+      bool drone = BanDrones.Value ? CardIsDrone(card) : false;
       return chest || equipBarrel || chanceShrine || bloodShrine || tripleShop || barrel || otherShrine || lunarChest || printer;
     }
 
@@ -213,7 +223,19 @@ namespace Sacrifice
     private static bool CardIsChest(DirectorCard card)
     {
       string name = card.spawnCard.prefab.name;
-      return name.Contains("Chest") && name != "LunarChest";
+      return name.Contains("Chest") && name != "LunarChest" && name != "Chest1Stealthed";
+    }
+
+    private static bool CardIsCloakedChest(DirectorCard card)
+    {
+      string name = card.spawnCard.prefab.name;
+      return name == "Chest1Stealthed";
+    }
+
+    private static bool CardIsDrone(DirectorCard card)
+    {
+      string name = card.spawnCard.prefab.name;
+      return name.Contains("Drone");
     }
 
     private static bool CardIsEquipmentBarrel(DirectorCard card)
@@ -255,7 +277,7 @@ namespace Sacrifice
     private static bool CardIsPrinter(DirectorCard card)
     {
       string name = card.spawnCard.prefab.name;
-      return name.Contains("Printer");
+      return name.Contains("Duplicator");
     }
   }
 }

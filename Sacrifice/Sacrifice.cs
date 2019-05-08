@@ -3,124 +3,126 @@ using System;
 using System.Collections.Generic;
 using RoR2;
 using UnityEngine;
-using BepInEx.Configuration;
+using ConfigurationEnhanced;
 
 namespace Sacrifice
 {
   [BepInDependency("com.bepis.r2api", BepInDependency.DependencyFlags.HardDependency)]
-  [BepInPlugin("com.anticode.Sacrifice", "Sacrifice", "1.0.0")]
+  [BepInDependency("com.anticode.ConfigurationEnhanced", BepInDependency.DependencyFlags.HardDependency)]
+  [BepInPlugin("com.anticode.Sacrifice", "Sacrifice", "1.4.0")]
   public class Sacrifice : BaseUnityPlugin
   {
-    public static ConfigWrapper<int> BaseDropChance;
-    private static float DropChance;
+    public static ConfigWrapper<float> BaseDropChance;
+    private static float baseDropChance;
     public static ConfigWrapper<bool> CloverRerollDrops;
-    public static ConfigWrapper<bool> BanChests;
-    public static ConfigWrapper<bool> BanBarrels;
-    public static ConfigWrapper<bool> BanEquipmentBarrels;
-    public static ConfigWrapper<bool> BanChanceShrine;
-    public static ConfigWrapper<bool> BanBloodShrine;
-    public static ConfigWrapper<bool> BanTripleShops;
-    public static ConfigWrapper<bool> BanOtherShrines;
-    public static ConfigWrapper<bool> BanLunarChests;
-    public static ConfigWrapper<bool> BanPrinter;
-    public static ConfigWrapper<bool> ReduceBarrelSpawns;
+    private static bool cloverRerollDrops;
     public static ConfigWrapper<bool> GiveItemToPlayers;
-    public static ConfigWrapper<bool> BanDrones;
-    public static ConfigWrapper<bool> BanCloaked;
+    private static bool giveItemToPlayers;
+    public static ConfigWrapper<float> InteractableSpawnMultiplier;
+    private static float interactableSpawnMultiplier;
+    public static ConfigWrapper<float> InteractableCostMultiplier;
+    private static float interactableCostMultiplier;
+
+    public class InteractableConfig
+    {
+      public string Name;
+      public float SpawnWeightModifier;
+      public bool Banned;
+
+      public InteractableConfig(string name, float spawnWeightModifier, bool banned)
+      {
+        Name = name;
+        SpawnWeightModifier = spawnWeightModifier;
+        Banned = banned;
+      }
+    }
+
+    public static ConfigWrapper<InteractableConfig> Interactables;
+    private static List<InteractableConfig> interactables;
     public Sacrifice()
     {
+      ConfigFile config = new ConfigFile("anticode-Sacrifice", false);
       // Fuck me, this is a long list of configs.
-      BaseDropChance = Config.Wrap(
-        "Chances",
-        "Base Drop Chance",
+      Logger.Log(BepInEx.Logging.LogLevel.Debug, "hi 0");
+      BaseDropChance = config.Wrap(
+        new string[] { "Chances" },
+        "BaseDropChance",
         "The base percent chance of an item dropping.",
-        7);
-      DropChance = Convert.ToSingle(BaseDropChance.Value);
-      if (DropChance <= 0) DropChance = 1f;
-      CloverRerollDrops = Config.Wrap(
-        "Other",
-        "Clovers Reroll Drops",
+        1.0f);
+      Logger.Log(BepInEx.Logging.LogLevel.Debug, "hi 1");
+      CloverRerollDrops = config.Wrap(
+        new string[] { "Other" },
+        "CloversRerollDrops",
         "Can clovers reroll the chance of an item dropping.",
         true);
-      ReduceBarrelSpawns = Config.Wrap(
-        "Other",
-        "Reduce Barrel Spawns",
-        "Reduce the spawn rate of barrels.",
-        true);
-      GiveItemToPlayers = Config.Wrap(
-        "Other",
-        "Give items to players",
+      Logger.Log(BepInEx.Logging.LogLevel.Debug, "hi 2");
+      GiveItemToPlayers = config.Wrap(
+        new string[] { "Other" },
+        "GiveItemsDirectly",
         "Give items directly to all players, without dropping them first.",
         false);
-      BanChests = Config.Wrap(
-        "Bans",
-        "Chests",
-        "Ban chests that aren't Lunar Chests or Cloaked Chests.",
-        true);
-      BanCloaked = Config.Wrap(
-        "Bans",
-        "Cloaked Chests",
-        "Ban cloaked chests.",
-        false);
-      BanLunarChests = Config.Wrap(
-        "Bans",
-        "Lunar Chests",
-        "Ban lunar chests",
-        true);
-      BanTripleShops = Config.Wrap(
-        "Bans",
-        "Triple Shop",
-        "Ban triple shops",
-        true);
-      BanEquipmentBarrels = Config.Wrap(
-        "Bans",
-        "Equipment Barrels",
-        "Ban equipment barrels",
-        true);
-      BanBarrels = Config.Wrap(
-        "Bans",
-        "Barrels",
-        "Ban any barrels that aren't Equipment Barrels",
-        false);
-      BanBloodShrine = Config.Wrap(
-        "Bans",
-        "Blood Shrine",
-        "Ban blood shrines",
-        true);
-      BanChanceShrine = Config.Wrap(
-        "Bans",
-        "Chance Shrine",
-        "Ban chance shrines",
-        true);
-      BanOtherShrines = Config.Wrap(
-        "Bans",
-        "Other Shrines",
-        "Ban any shrines that aren't blood shrines or chance shrines.",
-        false);
-      BanPrinter = Config.Wrap(
-        "Bans",
-        "3D Printers",
-        "Ban 3D Printers",
-        false);
-      BanDrones = Config.Wrap(
-        "Bans",
-        "Drones",
-        "Ban drones",
-        true);
+      Logger.Log(BepInEx.Logging.LogLevel.Debug, "hi 3");
+      InteractableSpawnMultiplier = config.Wrap(
+        new string[] { "Interactables" },
+        "InteractableSpawnMultiplier",
+        "A multiplier on the amount of interactables that will spawn in a level.",
+        1.0f);
+      Logger.Log(BepInEx.Logging.LogLevel.Debug, "hi 4");
+      InteractableCostMultiplier = config.Wrap(
+        new string[] { "Interactables" },
+        "InteractableCostMultiplier",
+        "A multiplier applied to the cost of all interactables.",
+        1.0f);
+      Logger.Log(BepInEx.Logging.LogLevel.Debug, "hi 5");
+      Interactables = config.ListWrap(
+        new string[] { "Interactables" },
+        "Individual",
+        "An array of interactable configurations.",
+        new List<InteractableConfig>
+        {
+          new InteractableConfig("Chest",1.0f,true),
+          new InteractableConfig("Chest2",1.0f,true),
+          new InteractableConfig("EquipmentBarrel",1.0f,true),
+          new InteractableConfig("TripleShop",1.0f,true),
+          new InteractableConfig("TripleShopLarge",1.0f,true),
+          new InteractableConfig("GoldChest",1.0f,true),
+          new InteractableConfig("LunarChest",1.0f,false),
+          new InteractableConfig("Barrel1",0.5f,false),
+          new InteractableConfig("ShrineHealing",1.0f,false),
+          new InteractableConfig("ShrineCombat", 1.0f,false),
+          new InteractableConfig("ShrineBlood",1.0f,true),
+          new InteractableConfig("ShrineBoss",1.0f,false),
+          new InteractableConfig("ShrineRestack",1.0f,false),
+          new InteractableConfig("ShrineChance",1.0f,true),
+          new InteractableConfig("BrokenDrone1",1.0f,false),
+          new InteractableConfig("BrokenDrone2",1.0f,false),
+          new InteractableConfig("BrokenMegaDrone",1.0f,false),
+          new InteractableConfig("BrokenMissileDrone",1.0f,false),
+          new InteractableConfig("BrokenTurret1",1.0f,false),
+          new InteractableConfig("Chest1Stealthed",1.0f,false),
+          new InteractableConfig("RadarTower",1.0f,false),
+          new InteractableConfig("ShrineGoldshoresAccess",0.5f,false),
+          new InteractableConfig("Duplicator",1.0f,false),
+          new InteractableConfig("DuplicatorLarge",1.0f,false),
+          new InteractableConfig("DuplicatorMilitary",1.0f,false),
+        });
+      baseDropChance = BaseDropChance.Read();
+      cloverRerollDrops = CloverRerollDrops.Read();
+      giveItemToPlayers = GiveItemToPlayers.Read();
+      interactableSpawnMultiplier = InteractableSpawnMultiplier.Read();
+      interactableCostMultiplier = InteractableSpawnMultiplier.Read();
+      interactables = Interactables.ListRead();
     }
 
     public void Awake()
     {
       // Give player allies the chance to drop items.
-      On.RoR2.CharacterMaster.Init += (orig) =>
+      GlobalEventManager.onCharacterDeathGlobal += (damageReport) =>
       {
-        GlobalEventManager.onCharacterDeathGlobal += (damageReport) =>
-        {
-          GameObject masterObject = damageReport.damageInfo.attacker.GetComponent<CharacterBody>().masterObject;
-          if (masterObject == null || damageReport.victimBody.teamComponent.teamIndex != TeamIndex.Monster) return;
-          RollSpawnChance(damageReport);
-        };
-        orig();
+        if (damageReport == null) return;
+        GameObject masterObject = damageReport.damageInfo.attacker.GetComponent<CharacterBody>().masterObject;
+        if (masterObject == null || damageReport.victimBody.teamComponent.teamIndex != TeamIndex.Monster) return;
+        RollSpawnChance(damageReport);
       };
       // Remove banned items from cards. This replaces the default card selection behavior.
       On.RoR2.ClassicStageInfo.GenerateDirectorCardWeightedSelection += (orig, instance, categorySelection) =>
@@ -131,12 +133,7 @@ namespace Sacrifice
           float num = categorySelection.SumAllWeightsInCategory(category);
           foreach (DirectorCard directorCard in category.cards)
           {
-            if (IsBanned(directorCard)) continue;
-            if (CardIsBarrel(directorCard) && ReduceBarrelSpawns.Value)
-            {
-              // Reduce selection weight for the Barrel card
-              directorCard.selectionWeight /= 2;
-            }
+            if (!ApplyConfigModifiers(directorCard)) continue;
             weightedSelection.AddChoice(directorCard, directorCard.selectionWeight / num * category.selectionWeight);
           }
         }
@@ -147,7 +144,7 @@ namespace Sacrifice
     private void RollSpawnChance(DamageReport damageReport)
     {
       // Roll percent chance has a base value of 7% (configurable), multiplied by 1 + .3 per player above 1.
-      float percentChance = DropChance * (1f + ((NetworkUser.readOnlyInstancesList.Count - 1f) * 0.3f));
+      float percentChance = baseDropChance * (1f + ((NetworkUser.readOnlyInstancesList.Count - 1f) * 0.3f));
       WeightedSelection<List<PickupIndex>> weightedSelection = new WeightedSelection<List<PickupIndex>>(5);
       // This is done this way because elite bosses are possible, and should have the option to drop reds than their standard boss counterparts.
       if (damageReport.victimBody.isElite)
@@ -174,10 +171,10 @@ namespace Sacrifice
       PickupIndex pickupIndex = list[Run.instance.spawnRng.RangeInt(0, list.Count)];
       CharacterMaster master = damageReport.damageInfo.attacker.GetComponent<CharacterBody>().master;
       float luck = 0f;
-      if (master && CloverRerollDrops.Value == true) luck = master.luck;
+      if (master && cloverRerollDrops == true) luck = master.luck;
       if (Util.CheckRoll(percentChance, luck, null))
       {
-        if (GiveItemToPlayers.Value)
+        if (giveItemToPlayers)
         {
           foreach (NetworkUser networkUser in NetworkUser.readOnlyInstancesList)
           {
@@ -197,87 +194,16 @@ namespace Sacrifice
       }
     }
 
-    /* The following is just an ugly block of functions for testing banned items */
-    private static bool IsBanned(DirectorCard card)
+    private static bool ApplyConfigModifiers(DirectorCard card)
     {
-      bool chest = BanChests.Value ? CardIsChest(card) : false;
-      bool equipBarrel = BanEquipmentBarrels.Value ? CardIsEquipmentBarrel(card) : false;
-      bool chanceShrine = BanChanceShrine.Value ? CardIsChanceShrine(card) : false;
-      bool bloodShrine = BanBloodShrine.Value ? CardIsBloodShrine(card) : false;
-      bool tripleShop = BanTripleShops.Value ? CardIsTripleShop(card) : false;
-      bool barrel = BanBarrels.Value ? CardIsBarrel(card) : false;
-      bool otherShrine = BanOtherShrines.Value ? CardIsOtherShrine(card) : false;
-      bool lunarChest = BanLunarChests.Value ? CardIsLunarChest(card) : false;
-      bool printer = BanPrinter.Value ? CardIsPrinter(card) : false;
-      bool cloakedChest = BanCloaked.Value ? CardIsCloakedChest(card) : false;
-      bool drone = BanDrones.Value ? CardIsDrone(card) : false;
-      return chest || equipBarrel || chanceShrine || bloodShrine || tripleShop || barrel || otherShrine || lunarChest || printer;
-    }
-
-    private static bool CardIsLunarChest(DirectorCard card)
-    {
-      string name = card.spawnCard.prefab.name;
-      return name == "LunarChest";
-    }
-
-    private static bool CardIsChest(DirectorCard card)
-    {
-      string name = card.spawnCard.prefab.name;
-      return name.Contains("Chest") && name != "LunarChest" && name != "Chest1Stealthed";
-    }
-
-    private static bool CardIsCloakedChest(DirectorCard card)
-    {
-      string name = card.spawnCard.prefab.name;
-      return name == "Chest1Stealthed";
-    }
-
-    private static bool CardIsDrone(DirectorCard card)
-    {
-      string name = card.spawnCard.prefab.name;
-      return name.Contains("Drone");
-    }
-
-    private static bool CardIsEquipmentBarrel(DirectorCard card)
-    {
-      string name = card.spawnCard.prefab.name;
-      return name == "EquipmentBarrel";
-    }
-
-    private static bool CardIsChanceShrine(DirectorCard card)
-    {
-      string name = card.spawnCard.prefab.name;
-      return name.Contains("Chance");
-    }
-
-    private static bool CardIsBloodShrine(DirectorCard card)
-    {
-      string name = card.spawnCard.prefab.name;
-      return name.Contains("Blood");
-    }
-
-    private static bool CardIsTripleShop(DirectorCard card)
-    {
-      string name = card.spawnCard.prefab.name;
-      return name.Contains("TripleShop");
-    }
-
-    private static bool CardIsBarrel(DirectorCard card)
-    {
-      string name = card.spawnCard.prefab.name;
-      return name.Contains("Barrel") && name != "Equipment";
-    }
-
-    private static bool CardIsOtherShrine(DirectorCard card)
-    {
-      string name = card.spawnCard.prefab.name;
-      return name.Contains("Shrine") && !name.Contains("Blood") && !name.Contains("Chance");
-    }
-    
-    private static bool CardIsPrinter(DirectorCard card)
-    {
-      string name = card.spawnCard.prefab.name;
-      return name.Contains("Duplicator");
+      foreach (InteractableConfig interactableConfig in interactables)
+      {
+        if (card.spawnCard.prefab.name != interactableConfig.Name) continue;
+        if (interactableConfig.Banned) return false;
+        card.selectionWeight = Mathf.RoundToInt(card.selectionWeight * interactableConfig.SpawnWeightModifier);
+        break;
+      }
+      return true;
     }
   }
 }

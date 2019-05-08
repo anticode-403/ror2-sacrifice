@@ -74,7 +74,6 @@ C:\Users\tronb\source\repos\Sacrifice\Sacrifice\bin\Debug\Rewired_Core.dll
 C:\Users\tronb\source\repos\Sacrifice\Sacrifice\bin\Debug\Wwise.dll
 C:\Users\tronb\source\repos\Sacrifice\Sacrifice\bin\Debug\Zio.dll
 C:\Users\tronb\source\repos\Sacrifice\Sacrifice\bin\Debug\Rewired_CSharp.dll
-C:\Users\tronb\source\repos\Sacrifice\Sacrifice\bin\Debug\Mono.Security.dll
 C:\Users\tronb\source\repos\Sacrifice\Sacrifice\bin\Debug\UnityEngine.xml
 C:\Users\tronb\source\repos\Sacrifice\Sacrifice\bin\Debug\UnityEngine.AccessibilityModule.xml
 C:\Users\tronb\source\repos\Sacrifice\Sacrifice\bin\Debug\UnityEngine.AIModule.xml
@@ -139,3 +138,4 @@ C:\Users\tronb\source\repos\Sacrifice\Sacrifice\obj\Debug\Sacrifice.csproj.CoreC
 C:\Users\tronb\source\repos\Sacrifice\Sacrifice\obj\Debug\Sacrifice.csproj.CopyComplete
 C:\Users\tronb\source\repos\Sacrifice\Sacrifice\obj\Debug\Sacrifice.dll
 C:\Users\tronb\source\repos\Sacrifice\Sacrifice\obj\Debug\Sacrifice.pdb
+C:\Users\tronb\source\repos\Sacrifice\Sacrifice\obj\Debug\Sacrifice.csprojAssemblyReference.cache

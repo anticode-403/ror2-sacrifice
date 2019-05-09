@@ -17,8 +17,6 @@ namespace Sacrifice
     private static float baseDropChance;
     public static ConfigWrapper<bool> CloverRerollDrops;
     private static bool cloverRerollDrops;
-    public static ConfigWrapper<bool> GiveItemToPlayers;
-    private static bool giveItemToPlayers;
     public static ConfigWrapper<float> InteractableSpawnMultiplier;
     private static float interactableSpawnMultiplier;
     public static ConfigWrapper<float> InteractableCostMultiplier;
@@ -57,12 +55,6 @@ namespace Sacrifice
         "Can clovers reroll the chance of an item dropping.",
         true);
       Logger.Log(BepInEx.Logging.LogLevel.Debug, "hi 2");
-      GiveItemToPlayers = config.Wrap(
-        new string[] { "Other" },
-        "GiveItemsDirectly",
-        "Give items directly to all players, without dropping them first.",
-        false);
-      Logger.Log(BepInEx.Logging.LogLevel.Debug, "hi 3");
       InteractableSpawnMultiplier = config.Wrap(
         new string[] { "Interactables" },
         "InteractableSpawnMultiplier",
@@ -109,7 +101,6 @@ namespace Sacrifice
         });
       baseDropChance = BaseDropChance.Read();
       cloverRerollDrops = CloverRerollDrops.Read();
-      giveItemToPlayers = GiveItemToPlayers.Read();
       interactableSpawnMultiplier = InteractableSpawnMultiplier.Read();
       interactableCostMultiplier = InteractableSpawnMultiplier.Read();
       interactables = Interactables.ListRead();
@@ -126,6 +117,7 @@ namespace Sacrifice
         GameObject attackerMaster = attackerBody.masterObject;
         if (attackerMaster == null || victimBody.teamComponent.teamIndex != TeamIndex.Monster) return;
         RollSpawnChance(victimBody, attackerBody);
+        orig(self, damageInfo);
       };
       // Remove banned items from cards. This replaces the default card selection behavior.
       On.RoR2.ClassicStageInfo.GenerateDirectorCardWeightedSelection += (orig, instance, categorySelection) =>
@@ -137,10 +129,17 @@ namespace Sacrifice
           foreach (DirectorCard directorCard in category.cards)
           {
             if (!ApplyConfigModifiers(directorCard)) continue;
+            directorCard.cost = Mathf.RoundToInt(directorCard.cost * interactableCostMultiplier);
             weightedSelection.AddChoice(directorCard, directorCard.selectionWeight / num * category.selectionWeight);
           }
         }
         return weightedSelection;
+      };
+      SceneDirector.onPrePopulateSceneServer += (director) =>
+      {
+        int interactableCredit = (int)GetInstanceField(typeof(SceneDirector), director, "interactableCredit");
+        interactableCredit = Mathf.RoundToInt(interactableCredit * interactableSpawnMultiplier);
+        SetInstanceField(typeof(SceneDirector), director, "interactableCredit", interactableCredit);
       };
     }
 
@@ -202,6 +201,13 @@ namespace Sacrifice
       BindingFlags bindFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static;
       FieldInfo field = type.GetField(fieldName, bindFlags);
       return field.GetValue(instance);
+    }
+
+    internal static void SetInstanceField(Type type, object instance, string fieldName, dynamic value)
+    {
+      BindingFlags bindFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static;
+      FieldInfo field = type.GetField(fieldName, bindFlags);
+      field.SetValue(instance, value);
     }
   }
 }

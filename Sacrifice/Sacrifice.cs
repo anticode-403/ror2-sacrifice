@@ -1,6 +1,7 @@
 ﻿using BepInEx;
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using RoR2;
 using UnityEngine;
 using ConfigurationEnhanced;
@@ -117,12 +118,14 @@ namespace Sacrifice
     public void Awake()
     {
       // Give player allies the chance to drop items.
-      GlobalEventManager.onCharacterDeathGlobal += (damageReport) =>
+      On.RoR2.DeathRewards.OnKilled += (orig, self, damageInfo) =>
       {
-        if (damageReport == null) return;
-        GameObject masterObject = damageReport.damageInfo.attacker.GetComponent<CharacterBody>().masterObject;
-        if (masterObject == null || damageReport.victimBody.teamComponent.teamIndex != TeamIndex.Monster) return;
-        RollSpawnChance(damageReport);
+        if (damageInfo == null) return;
+        CharacterBody victimBody = (CharacterBody)GetInstanceField(typeof(DeathRewards), self, "characterBody");
+        CharacterBody attackerBody = damageInfo.attacker.GetComponent<CharacterBody>();
+        GameObject attackerMaster = attackerBody.masterObject;
+        if (attackerMaster == null || victimBody.teamComponent.teamIndex != TeamIndex.Monster) return;
+        RollSpawnChance(victimBody, attackerBody);
       };
       // Remove banned items from cards. This replaces the default card selection behavior.
       On.RoR2.ClassicStageInfo.GenerateDirectorCardWeightedSelection += (orig, instance, categorySelection) =>
@@ -141,25 +144,25 @@ namespace Sacrifice
       };
     }
 
-    private void RollSpawnChance(DamageReport damageReport)
+    private void RollSpawnChance(CharacterBody victimBody, CharacterBody attackerBody)
     {
       // Roll percent chance has a base value of 7% (configurable), multiplied by 1 + .3 per player above 1.
       float percentChance = baseDropChance * (1f + ((NetworkUser.readOnlyInstancesList.Count - 1f) * 0.3f));
       WeightedSelection<List<PickupIndex>> weightedSelection = new WeightedSelection<List<PickupIndex>>(5);
       // This is done this way because elite bosses are possible, and should have the option to drop reds than their standard boss counterparts.
-      if (damageReport.victimBody.isElite)
+      if (victimBody.isElite)
       {
         weightedSelection.AddChoice(Run.instance.availableLunarDropList, 0.05f);
         weightedSelection.AddChoice(Run.instance.availableTier2DropList, 0.3f);
         weightedSelection.AddChoice(Run.instance.availableTier3DropList, 0.1f);
       }
-      if (damageReport.victimBody.isBoss)
+      if (victimBody.isBoss)
       {
         weightedSelection.AddChoice(Run.instance.availableTier2DropList, 0.6f);
         weightedSelection.AddChoice(Run.instance.availableTier3DropList, 0.3f);
       }
       // If the enemy in question is dead, then chances shoulder be the default for chests + some equipment item drop chances.
-      else if (!damageReport.victimBody.isElite)
+      else if (!victimBody.isElite)
       {
         weightedSelection.AddChoice(Run.instance.availableEquipmentDropList, 0.05f);
         weightedSelection.AddChoice(Run.instance.availableTier1DropList, 0.8f);
@@ -169,28 +172,16 @@ namespace Sacrifice
       // Item to drop is generated before the item pick up is generated for a future update.
       List<PickupIndex> list = weightedSelection.Evaluate(Run.instance.spawnRng.nextNormalizedFloat);
       PickupIndex pickupIndex = list[Run.instance.spawnRng.RangeInt(0, list.Count)];
-      CharacterMaster master = damageReport.damageInfo.attacker.GetComponent<CharacterBody>().master;
+      CharacterMaster master = attackerBody.master;
       float luck = 0f;
       if (master && cloverRerollDrops == true) luck = master.luck;
       if (Util.CheckRoll(percentChance, luck, null))
       {
-        if (giveItemToPlayers)
-        {
-          foreach (NetworkUser networkUser in NetworkUser.readOnlyInstancesList)
-          {
-            // Distribute via NetworkUser's array of players.
-            Chat.AddMessage("Distributed " + pickupIndex.GetPickupNameToken() + " among players.");
-            networkUser.master.inventory.GiveItem(pickupIndex.itemIndex, 1);
-          }
-        }
-        else
-        {
-          // Drop an item.
-          PickupDropletController.CreatePickupDroplet(
-            pickupIndex,
-            damageReport.victim.transform.position,
-            new Vector3(UnityEngine.Random.Range(-5.0f, 5.0f), 20f, UnityEngine.Random.Range(-5.0f, 5.0f)));
-        }
+        // Drop an item.
+        PickupDropletController.CreatePickupDroplet(
+          pickupIndex,
+          victimBody.transform.position,
+          new Vector3(UnityEngine.Random.Range(-5.0f, 5.0f), 20f, UnityEngine.Random.Range(-5.0f, 5.0f)));
       }
     }
 
@@ -204,6 +195,13 @@ namespace Sacrifice
         break;
       }
       return true;
+    }
+
+    internal static object GetInstanceField(Type type, object instance, string fieldName)
+    {
+      BindingFlags bindFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static;
+      FieldInfo field = type.GetField(fieldName, bindFlags);
+      return field.GetValue(instance);
     }
   }
 }

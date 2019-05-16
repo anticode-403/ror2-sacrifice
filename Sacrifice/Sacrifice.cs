@@ -384,8 +384,7 @@ namespace Sacrifice
       List<PickupIndex> list = weightedSelection.Evaluate(Run.instance.spawnRng.nextNormalizedFloat);
       PickupIndex pickupIndex = list[Run.instance.spawnRng.RangeInt(0, list.Count)];
       CharacterMaster master = attackerBody.master;
-      float luck = 0f;
-      if (master && cloverRerollDrops == true) luck = master.luck;
+      float luck = (master && cloverRerollDrops) ? master.luck : 0f;
       if (Util.CheckRoll(percentChance, luck, null))
       {
         // Drop an item.

@@ -211,4 +211,3 @@ C:\Users\rivecal21\source\repos\Sacrifice\Sacrifice\obj\Release\Sacrifice.csproj
 C:\Users\rivecal21\source\repos\Sacrifice\Sacrifice\obj\Release\Sacrifice.csproj.CopyComplete
 C:\Users\rivecal21\source\repos\Sacrifice\Sacrifice\obj\Release\Sacrifice.dll
 C:\Users\rivecal21\source\repos\Sacrifice\Sacrifice\obj\Release\Sacrifice.pdb
-C:\Users\tronb\source\repos\Sacrifice\Sacrifice\bin\Release\ConfigurationEnhanced.dll

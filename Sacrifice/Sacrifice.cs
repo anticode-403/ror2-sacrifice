@@ -1,15 +1,14 @@
 ﻿using BepInEx;
+using BepInEx.Configuration;
+using RoR2;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-using RoR2;
 using UnityEngine;
-using ConfigurationEnhanced;
 
 namespace Sacrifice
 {
   [BepInDependency("com.bepis.r2api", BepInDependency.DependencyFlags.HardDependency)]
-  [BepInDependency("com.anticode.ConfigurationEnhanced", BepInDependency.DependencyFlags.HardDependency)]
   [BepInPlugin("com.anticode.Sacrifice", "Sacrifice", "1.4.0")]
   public class Sacrifice : BaseUnityPlugin
   {
@@ -22,88 +21,316 @@ namespace Sacrifice
     public static ConfigWrapper<float> InteractableCostMultiplier;
     private static float interactableCostMultiplier;
 
+    public class DropWeights
+    {
+      public float LunarDropWeight;
+      public float Tier1DropWeight;
+      public float Tier2DropWeight;
+      public float Tier3DropWeight;
+      public float EquipmentDropWeight;
+
+      public DropWeights(ConfigWrapper<float> lunar, ConfigWrapper<float> tier1, ConfigWrapper<float> tier2, ConfigWrapper<float> tier3, ConfigWrapper<float> equipment)
+      {
+        LunarDropWeight = lunar.Value;
+        Tier1DropWeight = tier1.Value;
+        Tier2DropWeight = tier2.Value;
+        Tier3DropWeight = tier3.Value;
+        EquipmentDropWeight = equipment.Value;
+      }
+    }
+
+    private static DropWeights eliteDropWeights;
+    private static DropWeights bossDropWeights;
+    private static DropWeights normalDropWeights;
+
     public class InteractableConfig
     {
       public string Name;
       public float SpawnWeightModifier;
-      public bool Banned;
 
-      public InteractableConfig(string name, float spawnWeightModifier, bool banned)
+      public InteractableConfig(string name, float spawnWeightModifier)
       {
         Name = name;
         SpawnWeightModifier = spawnWeightModifier;
-        Banned = banned;
       }
     }
-
-    public static ConfigWrapper<InteractableConfig> Interactables;
     private static List<InteractableConfig> interactables;
     public Sacrifice()
     {
-      ConfigFile config = new ConfigFile("anticode-Sacrifice", false);
       // Fuck me, this is a long list of configs.
-      Logger.Log(BepInEx.Logging.LogLevel.Debug, "hi 0");
-      BaseDropChance = config.Wrap(
-        new string[] { "Chances" },
+      BaseDropChance = Config.Wrap(
+        "Chances",
         "BaseDropChance",
         "The base percent chance of an item dropping.",
         1.0f);
-      Logger.Log(BepInEx.Logging.LogLevel.Debug, "hi 1");
-      CloverRerollDrops = config.Wrap(
-        new string[] { "Other" },
+      eliteDropWeights = new DropWeights(
+          Config.Wrap(
+              "Chances.Elite",
+              "Lunar",
+              "The weight of a lunar item dropping (in comparison to other item catagories) on elite kills.",
+              0.05f
+            ),
+          Config.Wrap(
+              "Chances.Elite",
+              "Tier1",
+              "The weight of a white item dropping (in comparison to other item catagories) on elite kills.",
+              0.0f
+            ),
+          Config.Wrap(
+              "Chances.Elite",
+              "Tier2",
+              "The weight of a green item dropping (in comparison to other item catagories) on elite kills.",
+              0.3f
+            ),
+          Config.Wrap(
+              "Chances.Elite",
+              "Tier3",
+              "The weight of a red item dropping (in comparison to other item catagories) on elite kills.",
+              0.1f
+            ),
+          Config.Wrap(
+              "Chances.Elite",
+              "Equipment",
+              "The weight of an equipment item dropping (in comparison to other item catagories) on elite kills.",
+              0.0f
+            )
+        );
+      bossDropWeights = new DropWeights(
+          Config.Wrap(
+              "Chances.Boss",
+              "Lunar",
+              "The weight of a lunar item dropping (in comparison to other item catagories) on boss kills.",
+              0.0f
+            ),
+          Config.Wrap(
+              "Chances.Boss",
+              "Tier1",
+              "The weight of a white item dropping (in comparison to other item catagories) on boss kills.",
+              0.05f
+            ),
+          Config.Wrap(
+              "Chances.Boss",
+              "Tier2",
+              "The weight of a green item dropping (in comparison to other item catagories) on boss kills.",
+              0.6f
+            ),
+          Config.Wrap(
+              "Chances.Boss",
+              "Tier3",
+              "The weight of a red item dropping (in comparison to other item catagories) on boss kills.",
+              0.3f
+            ),
+          Config.Wrap(
+              "Chances.Boss",
+              "Equipment",
+              "The weight of an equipment item dropping (in comparison to other item catagories) on boss kills.",
+              0.0f
+            )
+        );
+      normalDropWeights = new DropWeights(
+          Config.Wrap(
+              "Chances.Boss",
+              "Lunar",
+              "The weight of a lunar item dropping (in comparison to other item catagories) on kills.",
+              0.0f
+            ),
+          Config.Wrap(
+              "Chances.Boss",
+              "Tier1",
+              "The weight of a white item dropping (in comparison to other item catagories) on kills.",
+              0.8f
+            ),
+          Config.Wrap(
+              "Chances.Boss",
+              "Tier2",
+              "The weight of a green item dropping (in comparison to other item catagories) on kills.",
+              0.2f
+            ),
+          Config.Wrap(
+              "Chances.Boss",
+              "Tier3",
+              "The weight of a red item dropping (in comparison to other item catagories) on kills.",
+              0.01f
+            ),
+          Config.Wrap(
+              "Chances.Boss",
+              "Equipment",
+              "The weight of an equipment item dropping (in comparison to other item catagories) on kills.",
+              0.05f
+            )
+        );
+      CloverRerollDrops = Config.Wrap(
+        "Other",
         "CloversRerollDrops",
         "Can clovers reroll the chance of an item dropping.",
         true);
-      Logger.Log(BepInEx.Logging.LogLevel.Debug, "hi 2");
-      InteractableSpawnMultiplier = config.Wrap(
-        new string[] { "Interactables" },
+      InteractableSpawnMultiplier = Config.Wrap(
+        "Interactables",
         "InteractableSpawnMultiplier",
         "A multiplier on the amount of interactables that will spawn in a level.",
         1.0f);
-      Logger.Log(BepInEx.Logging.LogLevel.Debug, "hi 4");
-      InteractableCostMultiplier = config.Wrap(
-        new string[] { "Interactables" },
+      InteractableCostMultiplier = Config.Wrap(
+        "Interactables",
         "InteractableCostMultiplier",
         "A multiplier applied to the cost of all interactables.",
         1.0f);
-      Logger.Log(BepInEx.Logging.LogLevel.Debug, "hi 5");
-      Interactables = config.ListWrap(
-        new string[] { "Interactables" },
-        "Individual",
-        "An array of interactable configurations.",
-        new List<InteractableConfig>
-        {
-          new InteractableConfig("Chest",1.0f,true),
-          new InteractableConfig("Chest2",1.0f,true),
-          new InteractableConfig("EquipmentBarrel",1.0f,true),
-          new InteractableConfig("TripleShop",1.0f,true),
-          new InteractableConfig("TripleShopLarge",1.0f,true),
-          new InteractableConfig("GoldChest",1.0f,true),
-          new InteractableConfig("LunarChest",1.0f,false),
-          new InteractableConfig("Barrel1",0.5f,false),
-          new InteractableConfig("ShrineHealing",1.0f,false),
-          new InteractableConfig("ShrineCombat", 1.0f,false),
-          new InteractableConfig("ShrineBlood",1.0f,true),
-          new InteractableConfig("ShrineBoss",1.0f,false),
-          new InteractableConfig("ShrineRestack",1.0f,false),
-          new InteractableConfig("ShrineChance",1.0f,true),
-          new InteractableConfig("BrokenDrone1",1.0f,false),
-          new InteractableConfig("BrokenDrone2",1.0f,false),
-          new InteractableConfig("BrokenMegaDrone",1.0f,false),
-          new InteractableConfig("BrokenMissileDrone",1.0f,false),
-          new InteractableConfig("BrokenTurret1",1.0f,false),
-          new InteractableConfig("Chest1Stealthed",1.0f,false),
-          new InteractableConfig("RadarTower",1.0f,false),
-          new InteractableConfig("ShrineGoldshoresAccess",0.5f,false),
-          new InteractableConfig("Duplicator",1.0f,false),
-          new InteractableConfig("DuplicatorLarge",1.0f,false),
-          new InteractableConfig("DuplicatorMilitary",1.0f,false),
-        });
-      baseDropChance = BaseDropChance.Read();
-      cloverRerollDrops = CloverRerollDrops.Read();
-      interactableSpawnMultiplier = InteractableSpawnMultiplier.Read();
-      interactableCostMultiplier = InteractableSpawnMultiplier.Read();
-      interactables = Interactables.ListRead();
+      ConfigWrapper<float> Chest = Config.Wrap(
+        "Interactables.Chances",
+        "Chest",
+        "The multiplier for this item to spawn.",
+        0.0f);
+      ConfigWrapper<float> Chest2 = Config.Wrap(
+        "Interactables.Chances",
+        "Chest2",
+        "The multiplier for this item to spawn.",
+        0.0f);
+      ConfigWrapper<float> EquipmentBarrel = Config.Wrap(
+        "Interactables.Chances",
+        "EquipmentBarrel",
+        "The multiplier for this item to spawn.",
+        0.0f);
+      ConfigWrapper<float> TripleShop = Config.Wrap(
+        "Interactables.Chances",
+        "TripleShop",
+        "The multiplier for this item to spawn.",
+        0.0f);
+      ConfigWrapper<float> TripleShopLarge = Config.Wrap(
+        "Interactables.Chances",
+        "TripleShopLarge",
+        "The multiplier for this item to spawn.",
+        0.0f);
+      ConfigWrapper<float> GoldChest = Config.Wrap(
+        "Interactables.Chances",
+        "GoldChest",
+        "The multiplier for this item to spawn.",
+        0.0f);
+      ConfigWrapper<float> LunarChest = Config.Wrap(
+        "Interactables.Chances",
+        "LunarChest",
+        "The multiplier for this item to spawn.",
+        1.0f);
+      ConfigWrapper<float> Barrel1 = Config.Wrap(
+        "Interactables.Chances",
+        "Barrel1",
+        "The multiplier for this item to spawn.",
+        0.5f);
+      ConfigWrapper<float> ShrineHealing = Config.Wrap(
+        "Interactables.Chances",
+        "ShrineHealing",
+        "The multiplier for this item to spawn.",
+        1.0f);
+      ConfigWrapper<float> ShrineBlood = Config.Wrap(
+        "Interactables.Chances",
+        "ShrineBlood",
+        "The multiplier for this item to spawn.",
+        0.0f);
+      ConfigWrapper<float> ShrineBoss = Config.Wrap(
+        "Interactables.Chances",
+        "ShrineBoss",
+        "The multiplier for this item to spawn.",
+        1.0f);
+      ConfigWrapper<float> ShrineChance = Config.Wrap(
+        "Interactables.Chances",
+        "ShrineChance",
+        "The multiplier for this item to spawn.",
+        0.0f);
+      ConfigWrapper<float> ShrineCombat = Config.Wrap(
+        "Interactables.Chances",
+        "ShrineCombat",
+        "The multiplier for this item to spawn.",
+        1.0f);
+      ConfigWrapper<float> ShrineRestack = Config.Wrap(
+        "Interactables.Chances",
+        "ShrineRestack",
+        "The multiplier for this item to spawn.",
+        1.0f);
+      ConfigWrapper<float> BrokenDrone1 = Config.Wrap(
+        "Interactables.Chances",
+        "BrokenDrone1",
+        "The multiplier for this item to spawn.",
+        1.0f);
+      ConfigWrapper<float> BrokenDrone2 = Config.Wrap(
+        "Interactables.Chances",
+        "BrokenDrone2",
+        "The multiplier for this item to spawn.",
+        1.0f);
+      ConfigWrapper<float> BrokenMegaDrone = Config.Wrap(
+        "Interactables.Chances",
+        "BrokenMegaDrone",
+        "The multiplier for this item to spawn.",
+        1.0f);
+      ConfigWrapper<float> BrokenMissileDrone = Config.Wrap(
+        "Interactables.Chances",
+        "BrokenMissileDrone",
+        "The multiplier for this item to spawn.",
+        1.0f);
+      ConfigWrapper<float> BrokenTurret1 = Config.Wrap(
+        "Interactables.Chances",
+        "BrokenTurret1",
+        "The multiplier for this item to spawn.",
+        1.0f);
+      ConfigWrapper<float> Chest1Stealthed = Config.Wrap(
+        "Interactables.Chances",
+        "Chest1Stealthed",
+        "The multiplier for this item to spawn.",
+        1.0f);
+      ConfigWrapper<float> RadarTower = Config.Wrap(
+        "Interactables.Chances",
+        "RadarTower",
+        "The multiplier for this item to spawn.",
+        1.0f);
+      ConfigWrapper<float> ShrineGoldshoresAccess = Config.Wrap(
+        "Interactables.Chances",
+        "ShrineGoldshoresAccess",
+        "The multiplier for this item to spawn.",
+        1.0f);
+      ConfigWrapper<float> Duplicator = Config.Wrap(
+        "Interactables.Chances",
+        "Duplicator",
+        "The multiplier for this item to spawn.",
+        1.0f);
+      ConfigWrapper<float> DuplicatorLarge = Config.Wrap(
+        "Interactables.Chances",
+        "DuplicatorLarge",
+        "The multiplier for this item to spawn.",
+        1.0f);
+      ConfigWrapper<float> DuplicatorMilitary = Config.Wrap(
+        "Interactables.Chances",
+        "DuplicatorMilitary",
+        "The multiplier for this item to spawn.",
+        1.0f);
+      baseDropChance = BaseDropChance.Value;
+      cloverRerollDrops = CloverRerollDrops.Value;
+      interactableSpawnMultiplier = InteractableSpawnMultiplier.Value;
+      interactableCostMultiplier = InteractableSpawnMultiplier.Value;
+      interactables = new List<InteractableConfig>
+      {
+        new InteractableConfig("Chest", Chest.Value),
+        new InteractableConfig("Chest2", Chest2.Value),
+        new InteractableConfig("GoldChest", GoldChest.Value),
+        new InteractableConfig("LunarChest", LunarChest.Value),
+        new InteractableConfig("Barrel1", Barrel1.Value),
+        new InteractableConfig("EquipmentBarrel", EquipmentBarrel.Value),
+        new InteractableConfig("Duplicator", Duplicator.Value),
+        new InteractableConfig("DuplicatorLarge", DuplicatorLarge.Value),
+        new InteractableConfig("DuplicatorMilitary", DuplicatorMilitary.Value),
+        new InteractableConfig("ShrineGoldshoresAccess", ShrineGoldshoresAccess.Value),
+        new InteractableConfig("RadarTower", RadarTower.Value),
+        new InteractableConfig("Chest1Stealthed", Chest1Stealthed.Value),
+        new InteractableConfig("BrokenDrone1", BrokenDrone1.Value),
+        new InteractableConfig("BrokenDrone2", BrokenDrone2.Value),
+        new InteractableConfig("BrokenMegaDrone", BrokenMegaDrone.Value),
+        new InteractableConfig("BrokenMissileDrone", BrokenMissileDrone.Value),
+        new InteractableConfig("BrokenTurret1", BrokenTurret1.Value),
+        new InteractableConfig("ShrineBlood", ShrineBlood.Value),
+        new InteractableConfig("ShrineBoss", ShrineBoss.Value),
+        new InteractableConfig("ShrineCombat", ShrineCombat.Value),
+        new InteractableConfig("ShrineChance", ShrineChance.Value),
+        new InteractableConfig("ShrineRestack", ShrineRestack.Value),
+        new InteractableConfig("ShrineHealing", ShrineHealing.Value),
+        new InteractableConfig("TripleShop", TripleShop.Value),
+        new InteractableConfig("TripleShopLarge", TripleShopLarge.Value),
+      };
     }
 
     public void Awake()
@@ -149,25 +376,10 @@ namespace Sacrifice
       float percentChance = baseDropChance * (1f + ((NetworkUser.readOnlyInstancesList.Count - 1f) * 0.3f));
       WeightedSelection<List<PickupIndex>> weightedSelection = new WeightedSelection<List<PickupIndex>>(5);
       // This is done this way because elite bosses are possible, and should have the option to drop reds than their standard boss counterparts.
-      if (victimBody.isElite)
-      {
-        weightedSelection.AddChoice(Run.instance.availableLunarDropList, 0.05f);
-        weightedSelection.AddChoice(Run.instance.availableTier2DropList, 0.3f);
-        weightedSelection.AddChoice(Run.instance.availableTier3DropList, 0.1f);
-      }
-      if (victimBody.isBoss)
-      {
-        weightedSelection.AddChoice(Run.instance.availableTier2DropList, 0.6f);
-        weightedSelection.AddChoice(Run.instance.availableTier3DropList, 0.3f);
-      }
+      if (victimBody.isElite) AddDropWeights(weightedSelection, eliteDropWeights);
+      if (victimBody.isBoss) AddDropWeights(weightedSelection, bossDropWeights);
       // If the enemy in question is dead, then chances shoulder be the default for chests + some equipment item drop chances.
-      else if (!victimBody.isElite)
-      {
-        weightedSelection.AddChoice(Run.instance.availableEquipmentDropList, 0.05f);
-        weightedSelection.AddChoice(Run.instance.availableTier1DropList, 0.8f);
-        weightedSelection.AddChoice(Run.instance.availableTier2DropList, 0.2f);
-        weightedSelection.AddChoice(Run.instance.availableTier3DropList, 0.01f);
-      }
+      else if (!victimBody.isElite) AddDropWeights(weightedSelection, normalDropWeights);
       // Item to drop is generated before the item pick up is generated for a future update.
       List<PickupIndex> list = weightedSelection.Evaluate(Run.instance.spawnRng.nextNormalizedFloat);
       PickupIndex pickupIndex = list[Run.instance.spawnRng.RangeInt(0, list.Count)];
@@ -184,12 +396,21 @@ namespace Sacrifice
       }
     }
 
+    private static void AddDropWeights(WeightedSelection<List<PickupIndex>> weightedSelection, DropWeights dropWeights)
+    {
+      weightedSelection.AddChoice(Run.instance.availableLunarDropList, dropWeights.LunarDropWeight);
+      weightedSelection.AddChoice(Run.instance.availableTier1DropList, dropWeights.Tier1DropWeight);
+      weightedSelection.AddChoice(Run.instance.availableTier2DropList, dropWeights.Tier2DropWeight);
+      weightedSelection.AddChoice(Run.instance.availableTier3DropList, dropWeights.Tier3DropWeight);
+      weightedSelection.AddChoice(Run.instance.availableEquipmentDropList, dropWeights.EquipmentDropWeight);
+    }
+
     private static bool ApplyConfigModifiers(DirectorCard card)
     {
       foreach (InteractableConfig interactableConfig in interactables)
       {
         if (card.spawnCard.prefab.name != interactableConfig.Name) continue;
-        if (interactableConfig.Banned) return false;
+        if (interactableConfig.SpawnWeightModifier <= 0.0f) return false;
         card.selectionWeight = Mathf.RoundToInt(card.selectionWeight * interactableConfig.SpawnWeightModifier);
         break;
       }

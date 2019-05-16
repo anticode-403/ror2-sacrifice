@@ -16,6 +16,12 @@ namespace Sacrifice
     private static float baseDropChance;
     public static ConfigWrapper<bool> CloverRerollDrops;
     private static bool cloverRerollDrops;
+    public static ConfigWrapper<float> PlayerScaling;
+    private static float playerScaling;
+    public static ConfigWrapper<bool> ReverseScaling;
+    private static bool reverseScaling;
+    public static ConfigWrapper<float> ReverseScalingRate;
+    private static float reverseScalingRate;
     public static ConfigWrapper<float> InteractableSpawnMultiplier;
     private static float interactableSpawnMultiplier;
     public static ConfigWrapper<float> InteractableCostMultiplier;
@@ -63,6 +69,21 @@ namespace Sacrifice
         "BaseDropChance",
         "The base percent chance of an item dropping.",
         1.0f);
+      PlayerScaling = Config.Wrap(
+        "Chances",
+        "PlayerScaling",
+        "The multiplier applied to the base drop chance per player. 0 to disable.",
+        0.3f);
+      ReverseScaling = Config.Wrap(
+        "Chances",
+        "ReverseScaling",
+        "Scale back drop chances. Note that reverse scaling can quickly backfire. You should find yourself adjusting ReverseScalingRate a lot.",
+        false);
+      ReverseScalingRate = Config.Wrap(
+        "Chances",
+        "ReverseScaling",
+        "Rate at which to scale back drop chances in relation to time played.",
+        0.1f);
       eliteDropWeights = new DropWeights(
           Config.Wrap(
               "Chances.Elite",
@@ -300,6 +321,9 @@ namespace Sacrifice
         "The multiplier for this item to spawn.",
         1.0f);
       baseDropChance = BaseDropChance.Value;
+      playerScaling = PlayerScaling.Value;
+      reverseScaling = ReverseScaling.Value;
+      reverseScalingRate = ReverseScalingRate.Value;
       cloverRerollDrops = CloverRerollDrops.Value;
       interactableSpawnMultiplier = InteractableSpawnMultiplier.Value;
       interactableCostMultiplier = InteractableSpawnMultiplier.Value;
@@ -373,7 +397,8 @@ namespace Sacrifice
     private void RollSpawnChance(CharacterBody victimBody, CharacterBody attackerBody)
     {
       // Roll percent chance has a base value of 7% (configurable), multiplied by 1 + .3 per player above 1.
-      float percentChance = baseDropChance * (1f + ((NetworkUser.readOnlyInstancesList.Count - 1f) * 0.3f));
+      float percentChance = baseDropChance * (1f + ((NetworkUser.readOnlyInstancesList.Count - 1f) * playerScaling));
+      if (reverseScaling) percentChance /= Run.instance.difficultyCoefficient * reverseScalingRate;
       WeightedSelection<List<PickupIndex>> weightedSelection = new WeightedSelection<List<PickupIndex>>(5);
       // This is done this way because elite bosses are possible, and should have the option to drop reds than their standard boss counterparts.
       if (victimBody.isElite) AddDropWeights(weightedSelection, eliteDropWeights);

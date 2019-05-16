@@ -129,31 +129,31 @@ namespace Sacrifice
         );
       normalDropWeights = new DropWeights(
           Config.Wrap(
-              "Chances.Boss",
+              "Chances.Normal",
               "Lunar",
               "The weight of a lunar item dropping (in comparison to other item catagories) on kills.",
               0.0f
             ),
           Config.Wrap(
-              "Chances.Boss",
+              "Chances.Normal",
               "Tier1",
               "The weight of a white item dropping (in comparison to other item catagories) on kills.",
               0.8f
             ),
           Config.Wrap(
-              "Chances.Boss",
+              "Chances.Normal",
               "Tier2",
               "The weight of a green item dropping (in comparison to other item catagories) on kills.",
               0.2f
             ),
           Config.Wrap(
-              "Chances.Boss",
+              "Chances.Normal",
               "Tier3",
               "The weight of a red item dropping (in comparison to other item catagories) on kills.",
               0.01f
             ),
           Config.Wrap(
-              "Chances.Boss",
+              "Chances.Normal",
               "Equipment",
               "The weight of an equipment item dropping (in comparison to other item catagories) on kills.",
               0.05f

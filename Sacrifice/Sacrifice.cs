@@ -62,6 +62,7 @@ namespace Sacrifice
             }
         }
         private static List<InteractableConfig> interactables;
+        private string[] interactablesCategories;
         public Sacrifice()
         {
             // Fuck me, this is a long list of configs.
@@ -387,6 +388,16 @@ namespace Sacrifice
         new InteractableConfig("CategoryChestHealing", CategoryChestHealing.Value),
         new InteractableConfig("CategoryChestUtility", CategoryChestUtility.Value),
       };
+        interactablesCategories = new string[]
+            {
+                "Chests",
+                "Barrels",
+                "Shrines",
+                "Drones",
+                "Misc",
+                "Rare",
+                "Duplicator"
+            };
         }
 
         public void Awake()
@@ -406,6 +417,8 @@ namespace Sacrifice
             // Remove banned items from cards. This replaces the default card selection behavior.
             On.RoR2.ClassicStageInfo.GenerateDirectorCardWeightedSelection += (orig, instance, categorySelection) =>
             {
+                // categorySelection is either interactableCategories or monsterCategories and we only want to modify the former
+                if (!IsInteractableCategorySelection(categorySelection)) return orig(instance, categorySelection);
                 WeightedSelection<DirectorCard> weightedSelection = new WeightedSelection<DirectorCard>(8);
                 foreach (DirectorCardCategorySelection.Category category in categorySelection.categories)
                 {
@@ -476,5 +489,20 @@ namespace Sacrifice
             return true;
         }
 
+        private bool IsInteractableCategorySelection(DirectorCardCategorySelection categorySelection)
+        {
+            // categorySelection either contains only interactable or monster category. So it's enough to check the first category
+            foreach (DirectorCardCategorySelection.Category category in categorySelection.categories)
+            {
+                foreach(string interactableCategory in interactablesCategories)
+                {
+                    if(category.name.Equals(interactableCategory))
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
     }
 }

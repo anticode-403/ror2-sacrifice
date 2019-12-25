@@ -435,7 +435,7 @@ namespace Sacrifice
           {
             if (directorCard.spawnCard.prefab.name == "Chest1") deathChestSpawnCard = directorCard;
             if (!ApplyConfigModifiers(directorCard)) continue;
-            directorCard.cost = Mathf.RoundToInt(directorCard.cost * interactableCostMultiplier);
+            directorCard.spawnCard.directorCreditCost = Mathf.RoundToInt(directorCard.cost * interactableCostMultiplier);
             weightedSelection.AddChoice(directorCard, directorCard.selectionWeight / num * category.selectionWeight);
           }
         }

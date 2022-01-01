@@ -1,3 +1,5 @@
+This mod has been completely inert for, like, years because Hopoo implemented an official Sacrifice artifact. Why are you here?
+
 # ror2-sacrifice
 A heavily customization-friendly mod that mimics Risk of Rain 1's Sacrifice artifact
 
